@@ -1,10 +1,32 @@
+# Function: espnStats
+# -------------------
+# This function scrapes weekly scoreboard statistics from the ESPN 
+# Fantasy Baseball website.
+# 
+# Argument: url should be of the form: 
+# 
+# http://games.espn.go.com/flb/scoreboard?leagueId=XXXXXX&seasonId=YYYY
+# 
+# where XXXXXX is replaced by the numerical league ID and YYYY is replaced
+# by the four-digit year of the desired season.
+# 
+# Return value: data.frame containing statistics for each team in each 
+# week of the season.
+
 espnStats <- function(url) {
         
+        # required for parsing HTML
         library("XML")
         
+        # weekly scoring period index
         period <- 1
+        
+        # parsed HTML data storage
         cache <- NULL
+        
+        # raw HTML data storage 
         stream <- character(0)
+        
         while(!is.null(stream)) {
                 stream <- tryCatch({
                         readLines(paste(url, "&matchupPeriodId=", 
@@ -15,10 +37,13 @@ espnStats <- function(url) {
                         NULL
                 }, finally={ })
                 
+                # cache all scoring periods before parsing
                 if(!is.null(stream)) {
                         html <- htmlTreeParse(stream, useInternalNodes=TRUE)
                         row <- xpathSApply(html, "//table/tr[@class='linescoreTeamRow']/td", xmlValue)
                         row <- grep("[[:alnum:]]+", row, value=TRUE)
+                        
+                        # initialize cache
                         if(is.null(cache)) {
                                 colNames <- xpathSApply(html, "//table/tr[@class='tableSubHead']/th", xmlValue)
                                 colNames <- unique(colNames)
@@ -28,6 +53,7 @@ espnStats <- function(url) {
                                 
                                 cache <- matrix("", nrow=23, ncol=length(row))
                         }
+                        
                         cache[period,] <- row
                         period <- period + 1
                 } else {
@@ -35,9 +61,12 @@ espnStats <- function(url) {
                 }
         }
         
+        # initialize output
         stats <- as.data.frame(matrix(0.0, nrow=length(teams) * period, 
                                       ncol=length(colNames) + 1))
         names(stats) <- c(colNames, "WEEK")
+        
+        # parse and format cache
         dfIndex <- 1
         for(i in 1:period) {
                 for(j in 1:ncol(cache)) {
